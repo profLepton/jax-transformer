@@ -12,7 +12,15 @@ class config():
     hidden_size = 128
     context_length = 128
     num_heads = 4
-    causal = 
+    causal = True
+
+
+def softmax(x):
+    return x
+
+def gelu(x):
+    return x
+
 
 class nn:
 
@@ -36,26 +44,6 @@ class nn:
     def __type__(self):
         return "<class Neural Net>"
 
-
-class MultiHeadSelfAttention(nn):
-    
-    def __init__(self, config):
-        super().__init__()
-        self.kqv_proj = Linear(config.hidden_size, 3 * config.hidden_size, bias=False)
-        self.num_heads = config.num_heads
-        self.causal = config.causal
-
-
-
-class Blocks(nn):
-
-    def __init__(self, config):
-        super().__init__()
-        
-
-    def forward(self, x):
-        return x
-
 class Linear(nn):
 
     def __init__(self, input_size, output_size, bias):
@@ -66,6 +54,66 @@ class Linear(nn):
             self.forward = jit(lambda x: jnp.dot(x, self.weights) + self.bias)
         else:
             self.forward = jit(lambda x: jnp.dot(x, self.weights))
+
+
+class FFN(nn):
+
+    def __init__(self, input_size, output_size, bias):
+        super().__init__()
+        self.layer1 = Linear(input_size, 4 * output_size, bias)
+        self.layer2 = Linear(4* output_size, input_size, bias) 
+        
+    def forward(self, x): 
+        x = gelu(self.layer1(x)) 
+        x = gelu(self.layer2(x)) 
+        return x 
+
+
+class LayerNorm(nn): 
+    def __init__(self, config): 
+        pass 
+    def forward(self, x): 
+        return x
+
+class MultiHeadSelfAttention(nn):
+    
+    def __init__(self, config):
+        super().__init__()
+        self.kqv_proj = Linear(config.hidden_size, 3 * config.hidden_size, bias=False)
+        self.num_heads = config.num_heads
+        self.causal = config.causal
+        self.num_heads = config.num_heads
+
+    def forward(self, x):
+        B, T, C = x.shape
+        kqv = self.kqv_proj(x)
+        kqv = kqv.reshape(B, T, self.num_heads, -1)
+        kqv = kqv.transpose(0, 2, 1, 3)
+        k, q, v = jnp.split(kqv, 3, axis=-1)
+
+
+        return x
+        
+         
+
+
+
+
+class Blocks(nn):
+
+    def __init__(self, config):
+        super().__init__()
+        self.mhsa = MultiHeadSelfAttention(config)
+        self.ffn = FFN(config.hidden_size, config.hidden_size, False)
+        self.ln1 = LayerNorm(config)
+        self.ln2 = LayerNorm(config)
+
+    def forward(self, x):
+        
+        x = self.ln1(x + self.mhsa(x))
+        x = self.ln2(x + self.ffn(x))
+
+        return x
 
 
 class LanguageModel(nn):
