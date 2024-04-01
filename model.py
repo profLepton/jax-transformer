@@ -34,7 +34,7 @@ class nn:
         return self.forward(*args)
 
     def __type__(self):
-        return "<class Neural Ne>t"
+        return "<class Neural Net>"
 
 
 class MultiHeadSelfAttention(nn):
