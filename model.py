@@ -7,19 +7,20 @@ from functools import partial
 
 @dataclass
 class config():
-    num_layers = 3 
-    vocab_size = 100
+    num_layers = 3
+    vocab_size = 100_000
     hidden_size = 128
     context_length = 128
     num_heads = 4
     causal = True
 
-
-def softmax(x):
-    return x
+def softmax(x, axis):
+    maxes = jnp.max(x, axis=axis, keepdims=True)
+    xp = jnp.exp(x-maxes)
+    return xp/jnp.sum(xp, axis=axis, keepdims=True)
 
 def gelu(x):
-    return x
+    return 0.5 * x * (1 + jnp.tanh(jnp.power(2/jnp.pi, 0.5) * ( x + 0.044715 * jnp.power(x, 3)))) 
 
 
 class nn:
@@ -75,6 +76,53 @@ class LayerNorm(nn):
     def forward(self, x): 
         return x
 
+
+
+def masked_attention(causal, kqv_proj, num_heads):
+    
+
+    def mask_fn(att):
+        B, H, T, T = att.shape
+        mask = jnp.ones((T, T))
+        mask = jnp.expand_dims(mask, 0)
+        mask = jnp.repeat(mask, H, 0)
+        mask = jax.lax.stop_gradient(jnp.expand_dims(mask, 0))
+
+        att = jnp.where(mask == 0, -jnp.inf,  att)
+        return att
+
+    def no_mask(att, mask):
+        return att
+
+    if causal:
+        return partial(scaled_attention, kqv_proj=kqv_proj, num_heads=num_heads, mask_fn=mask_fn)
+
+
+    return partial(scaled_attention, mask=None, kqv_proj=kqv_proj, num_heads=num_heads, mask_fn=no_mask)
+
+
+
+def scaled_attention(x,  kqv_proj, num_heads, mask_fn):
+        
+        B, T, C = x.shape
+        kqv = kqv_proj(x)
+        kqv = kqv.reshape(B, T, num_heads, -1)
+        kqv = kqv.transpose(0, 2, 1, 3)
+        k, q, v = jnp.split(kqv, 3, axis=-1)
+        
+        att  = jnp.matmul(k, q.transpose(0, 1, 3, 2)) / jnp.power(C, 0.5)
+        
+        att = mask_fn(att)
+
+        att = softmax(att, axis=3)
+
+        out = jnp.matmul(att, v)
+        out = out.transpose(0, 2, 1, 3)
+        out = out.reshape(B, T, C)
+
+        return out      
+
+
 class MultiHeadSelfAttention(nn):
     
     def __init__(self, config):
@@ -82,23 +130,12 @@ class MultiHeadSelfAttention(nn):
         self.kqv_proj = Linear(config.hidden_size, 3 * config.hidden_size, bias=False)
         self.num_heads = config.num_heads
         self.causal = config.causal
+        self.forward = jit(masked_attention(self.causal, self.kqv_proj, self.num_heads)) 
         self.num_heads = config.num_heads
-
-    def forward(self, x):
-        B, T, C = x.shape
-        kqv = self.kqv_proj(x)
-        kqv = kqv.reshape(B, T, self.num_heads, -1)
-        kqv = kqv.transpose(0, 2, 1, 3)
-        k, q, v = jnp.split(kqv, 3, axis=-1)
-
-
-        return x
         
-         
 
-
-
-
+    
+      
 class Blocks(nn):
 
     def __init__(self, config):
@@ -109,7 +146,7 @@ class Blocks(nn):
         self.ln2 = LayerNorm(config)
 
     def forward(self, x):
-        
+        B, T, C = x.shape
         x = self.ln1(x + self.mhsa(x))
         x = self.ln2(x + self.ffn(x))
 
@@ -125,6 +162,7 @@ class LanguageModel(nn):
         self.num_layers = config.num_layers
         self.blocks = [Blocks(config) for _ in range(self.num_layers)]
         self.head = Linear(config.hidden_size, config.vocab_size, bias=False)
+
 
     def forward(self, x):
         # x : tokenized inputs
@@ -147,7 +185,7 @@ class LanguageModel(nn):
 conf = config()
 
 model = LanguageModel(conf)
-input_tokens = jnp.expand_dims(jnp.array([1, 2, 3]), axis=0)
+input_tokens = jnp.repeat(jnp.expand_dims(jnp.array([1, 2, 3]), axis=0), 1000, 0)
 
 out = model(input_tokens)
 
