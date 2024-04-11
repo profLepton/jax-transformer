@@ -4,15 +4,9 @@ import jax.numpy as jnp
 from jax import jit
 from dataclasses import dataclass
 from functools import partial
+from config import Config
 
-@dataclass
-class config():
-    num_layers = 3
-    vocab_size = 100_000
-    hidden_size = 128
-    context_length = 128
-    num_heads = 4
-    causal = True
+
 
 def softmax(x, axis):
     maxes = jnp.max(x, axis=axis, keepdims=True)
@@ -182,7 +176,7 @@ class LanguageModel(nn):
         return logits
 
 
-conf = config()
+conf = Config()
 
 model = LanguageModel(conf)
 input_tokens = jnp.repeat(jnp.expand_dims(jnp.array([1, 2, 3]), axis=0), 1000, 0)
