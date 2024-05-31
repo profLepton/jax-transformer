@@ -8,17 +8,28 @@ from config import Config
 # implement one hot in the future
 
 
-def softmax(x, axis):
+def softmax(x, axis=-1):
     maxes = jnp.max(x, axis=axis, keepdims=True)
     xp = jnp.exp(x-maxes)
     return xp/jnp.sum(xp, axis=axis, keepdims=True)
-
+@jit
 def gelu(x):
     return 0.5 * x * (1 + jnp.tanh(jnp.power(2/jnp.pi, 0.5) * ( x + 0.044715 * jnp.power(x, 3)))) 
 
+@jit
+def kl_divergence(true, pred, axis=0):
+    logsoftmax = softmax(jnp.dot(true, jnp.transpose(pred, (0, 2, 1))), axis=None)
+    return -jnp.mean(jnp.mean(logsoftmax))
 
-def kl_divergence(true, pred, axis=-1):
-    return jnp.mean(true * jnp.log(true/ pred), axis=axis, keepdims=True)
+
+@jit
+class AdamOpt:
+
+    def __init__(self, parameters):
+        self.params = parameters
+
+    def step(self):
+        pass
 
 
 class nn:
@@ -181,7 +192,7 @@ class LanguageModel(nn):
         if targets is None:
             return logits
         
-        loss = kl_divergence(true=jnp.reshape(targets, -1), pred=jnp.reshape(logits, -1))
+        loss = kl_divergence(true=targets, pred=logits )
 
         return logits, loss
 

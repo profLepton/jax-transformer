@@ -21,7 +21,7 @@ enc = tiktoken.get_encoding("gpt2")
 
 batches = []
 
-encoded = enc.encode(text[:10000])
+encoded = enc.encode(text[:1000])
 
 for i in range(len(encoded)//Config.batch_size):
     batch = [jnp.empty((1, Config.context_length), dtype=jnp.int16), jnp.empty((1, Config.context_length, Config.vocab_size), dtype=jnp.int16) ]
@@ -44,9 +44,7 @@ target = batches[0][1]
 x = batches[0][0]
 
 
-out = model(x, target)
 
 
-print(out[0], " ---- ", out[1])
 
 
