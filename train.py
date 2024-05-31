@@ -13,7 +13,7 @@ for file in os.listdir(path):
     with open(path + file, 'r') as f:
         text += " " + f.read()
 
-enc = tiktoken.get_encoding("cl100k_base")
+enc = tiktoken.get_encoding("gpt2")
 
 # Need to multi thread this
 
@@ -22,9 +22,10 @@ batches = []
 encoded = enc.encode(text)
 
 for i in range(len(encoded)//Config.batch_size):
-    batch = []
+    batch = [[], []]
     for j in range(Config.batch_size):
-        batch.append(jnp.array(encoded[i*Config.context_length:(i+1)*Config.context_length]))
+        batch[0].append(jnp.array(encoded[i*Config.context_length:(i+1)*Config.context_length]))
+        batch[1].append(jnp.array(encoded[i*Config.context_length+1:(i+1)*Config.context_length+1]))
     batches.append(batch)
 
 print(f"{len(batches)} batches in dataset")
@@ -33,7 +34,11 @@ print(f"{len(batches)} batches in dataset")
 
 model = LanguageModel(Config())
 
-print(model(batches[0]))
+target = batches[0][1]
 
+x = batches[0][0]
+
+
+print(model(x, y))
 
 

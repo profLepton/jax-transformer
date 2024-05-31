@@ -17,6 +17,10 @@ def gelu(x):
     return 0.5 * x * (1 + jnp.tanh(jnp.power(2/jnp.pi, 0.5) * ( x + 0.044715 * jnp.power(x, 3)))) 
 
 
+def kl_divergence(self, p, q):
+    return jnp.mean(jnp.log(p/q))
+
+
 class nn:
 
     def __init__(self):
@@ -158,7 +162,7 @@ class LanguageModel(nn):
         self.head = Linear(config.hidden_size, config.vocab_size, bias=False)
 
 
-    def forward(self, x):
+    def forward(self, x, targets=None):
         # x : tokenized inputs
         B, T = x.shape
     
@@ -172,10 +176,18 @@ class LanguageModel(nn):
             token_embeds = block(token_embeds)        
 
         logits = self.head(token_embeds)
+        
+        
+        if target is None:
+            return logits
+        
+        probs = softmax(logits, axis=-1)
+        loss = kl_divergence(logits, probs)
 
-        return logits
+        return logits, loss
 
 
+    
 
 
 
