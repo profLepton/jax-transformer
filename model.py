@@ -5,7 +5,7 @@ from jax import jit
 from dataclasses import dataclass
 from functools import partial
 from config import Config
-
+# implement one hot in the future
 
 
 def softmax(x, axis):
@@ -17,8 +17,8 @@ def gelu(x):
     return 0.5 * x * (1 + jnp.tanh(jnp.power(2/jnp.pi, 0.5) * ( x + 0.044715 * jnp.power(x, 3)))) 
 
 
-def kl_divergence(self, p, q):
-    return jnp.mean(jnp.log(p/q))
+def kl_divergence(true, pred, axis=-1):
+    return jnp.mean(true * jnp.log(true/ pred), axis=axis, keepdims=True)
 
 
 class nn:
@@ -178,11 +178,10 @@ class LanguageModel(nn):
         logits = self.head(token_embeds)
         
         
-        if target is None:
+        if targets is None:
             return logits
         
-        probs = softmax(logits, axis=-1)
-        loss = kl_divergence(logits, probs)
+        loss = kl_divergence(true=jnp.reshape(targets, -1), pred=jnp.reshape(logits, -1))
 
         return logits, loss
 
