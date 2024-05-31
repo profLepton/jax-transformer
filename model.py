@@ -176,11 +176,6 @@ class LanguageModel(nn):
         return logits
 
 
-conf = Config()
 
-model = LanguageModel(conf)
-input_tokens = jnp.repeat(jnp.expand_dims(jnp.array([1, 2, 3]), axis=0), 1000, 0)
 
-out = model(input_tokens)
 
-print(out.shape)
